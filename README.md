@@ -22,6 +22,8 @@ College students studying computer science, software engineering, mathematics, a
 - Mermaid diagrams with safe fallback (`securityLevel: strict`)
 - Server-side Gemma 4 via `@google/genai`
 
+video link:- https://youtu.be/4osLIkxqwno
+
 ### Learning depth
 
 | Depth | Behavior |
