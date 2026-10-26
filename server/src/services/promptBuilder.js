@@ -8,11 +8,11 @@ Do not include trailing commas.
 `;
 
 const DEPTH_INSTRUCTIONS = {
-  'quick-refresher': `Learning depth: Quick Refresher — focus on the essential idea and one concise example; skip unnecessary background but keep critical caveats.`,
-  foundational: `Learning depth: Foundational — establish prerequisites and core terminology; explain the underlying concept with one concrete example.`,
-  intermediate: `Learning depth: Intermediate — conceptual detail, technical terminology, examples, and practical implications; explain how and why it works.`,
-  advanced: `Learning depth: Advanced — deeper mechanisms, edge cases, trade-offs, and relevant math or technical detail; assume prerequisite knowledge.`,
-  'in-depth': `Learning depth: In-Depth / Research-Oriented — structured and comprehensive; include assumptions, limitations, alternatives, and advanced implications; distinguish established facts from uncertainty.`,
+  'quick-refresher': `Learning depth: Quick Refresher — focus on the essential idea and one concise example; skip unnecessary background but keep critical caveats. Aim for 100-150 words total.`,
+  foundational: `Learning depth: Foundational — establish only the necessary prerequisites and core terminology; explain the concept with one concrete example. Aim for 180-260 words total.`,
+  intermediate: `Learning depth: Intermediate — explain how and why it works with technical terms, one example, and practical implications. Aim for 250-350 words total.`,
+  advanced: `Learning depth: Advanced — prioritize mechanisms, important edge cases, trade-offs, and relevant technical detail. Keep the notes structured and concise.`,
+  'in-depth': `Learning depth: In-Depth / Research-Oriented — cover assumptions, limitations, alternatives, and advanced implications in concise sections; distinguish established facts from uncertainty and avoid repetition.`,
 };
 
 const EXAM_LENGTH_INSTRUCTIONS = {
@@ -23,12 +23,17 @@ const EXAM_LENGTH_INSTRUCTIONS = {
 
 function baseContext(topic, subject, mode, learningDepth) {
   const depthLine = DEPTH_INSTRUCTIONS[learningDepth] || DEPTH_INSTRUCTIONS.intermediate;
+  const networkAccuracy = subject === 'Computer Networks'
+    ? `For networking topics, distinguish protocol guarantees from typical performance. Do not claim a protocol always has higher throughput or lower latency. Separate error detection (such as checksums) from delivery guarantees and retransmission; UDP itself does not guarantee delivery or retransmit lost data.`
+    : '';
   return `You are an expert technical tutor helping college students with engineering and computer science concepts.
 Topic: "${topic}"
 Subject area: ${subject}
 Explanation style: ${MODE_LABELS[mode] || mode}
 ${depthLine}
 Be accurate, clear, and respect the student's intelligence. Do not oversimplify advanced topics unless depth is foundational or quick-refresher.
+Write scan-friendly study notes: keep each field focused, avoid repeating the definition in the explanation, and omit optional details that do not clarify this topic. For Exam Mode, follow the selected mark length instead of the general word targets.
+${networkAccuracy}
 ${JSON_RULES}`;
 }
 
@@ -44,7 +49,7 @@ export function buildPrompt({
   if (simplify) {
     return `${baseContext(topic, subject, mode, learningDepth)}
 
-The student is still confused. Explain MORE SIMPLY in plain language.
+The student is still confused. Explain MORE SIMPLY in plain language, using a short, focused answer.
 Use simpler wording and explain difficult steps explicitly.
 Use a DIFFERENT analogy or metaphor than before when an analogy helps.
 Keep essential technical accuracy and relevant terminology.
