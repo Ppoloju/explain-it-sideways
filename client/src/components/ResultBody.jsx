@@ -1,6 +1,6 @@
 import MermaidBlock from './MermaidBlock.jsx';
 import CopyButton from './CopyButton.jsx';
-import { buildCopyPayload, buildExamCopy } from '../utils/copyText.js';
+import { buildCopyPayload } from '../utils/copyText.js';
 import { MODES, answerLengthLabel } from '../constants.js';
 
 function Section({ title, children, className = '' }) {
@@ -40,16 +40,12 @@ export default function ResultBody({ response, showCopy = true }) {
 
   const r = response.result;
   const fullCopy = buildCopyPayload(response);
-  const examCopy = buildExamCopy(response);
 
   return (
     <>
       {showCopy ? (
         <div className="result-actions inline-actions">
-          <CopyButton text={fullCopy} label="Copy explanation" />
-          {response.mode === 'exam' && r.examAnswer ? (
-            <CopyButton text={examCopy} label="Copy exam answer" />
-          ) : null}
+          <CopyButton text={fullCopy} />
         </div>
       ) : null}
 

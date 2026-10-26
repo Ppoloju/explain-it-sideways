@@ -1,22 +1,24 @@
 export async function copyToClipboard(text) {
   if (!text) return false;
+
   try {
     await navigator.clipboard.writeText(text);
     return true;
   } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+
     try {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly', '');
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(ta);
-      return ok;
+      textarea.select();
+      return document.execCommand('copy');
     } catch {
       return false;
+    } finally {
+      textarea.remove();
     }
   }
 }
@@ -24,58 +26,52 @@ export async function copyToClipboard(text) {
 export function buildCopyPayload(response) {
   if (!response?.result) return '';
   const r = response.result;
-  const lines = [
-    response.topic,
-    [
-      response.subject,
-      response.learningDepthLabel || response.learningDepth,
-      response.modeLabel || response.mode,
-      response.answerLength ? response.answerLength : null,
-    ]
-      .filter(Boolean)
-      .join(' · '),
-    '',
-  ];
+  const lines = [`# ${r.title || response.topic}`, '', `**Topic:** ${response.topic}`];
+  const details = [
+    response.subject,
+    response.learningDepthLabel || response.learningDepth,
+    response.modeLabel || response.mode,
+    response.answerLength ? `${response.answerLength} answer` : null,
+  ].filter(Boolean);
+  if (details.length) lines.push(`**Study notes:** ${details.join(' · ')}`);
 
-  if (r.definition) lines.push(`Definition: ${r.definition}`, '');
-  if (r.analogy) lines.push(`Analogy: ${r.analogy}`, '');
+  function addSection(title, content) {
+    if (!content) return;
+    lines.push('', `## ${title}`, '', content);
+  }
+
+  addSection('Definition', r.definition);
+  addSection('Everyday analogy', r.analogy);
   if (r.mapping?.length) {
-    lines.push('Mapping:');
-    r.mapping.forEach((m) => lines.push(`  • ${m.analogyPart} → ${m.technicalPart}`));
-    lines.push('');
+    lines.push('', '### Analogy mapping', '', '| In the analogy | In engineering |', '| --- | --- |');
+    r.mapping.forEach((m) =>
+      lines.push(`| ${markdownCell(m.analogyPart)} | ${markdownCell(m.technicalPart)} |`),
+    );
   }
-  if (r.scenario) lines.push(`Scenario: ${r.scenario}`, '');
-  if (r.technicalMeaning) lines.push(`Technical meaning: ${r.technicalMeaning}`, '');
-  if (r.explanation) lines.push(`Explanation: ${r.explanation}`, '');
-  if (r.diagramExplanation) lines.push(`Diagram: ${r.diagramExplanation}`, '');
-  if (r.example) lines.push(`Example: ${r.example}`, '');
-  if (r.misconception) lines.push(`Misconception: ${r.misconception}`, '');
-  if (r.examAnswer) lines.push(`Exam answer:\n${r.examAnswer}`, '');
-  if (r.memoryTrick) lines.push(`Memory trick: ${r.memoryTrick}`, '');
-  if (r.revisionSummary) lines.push(`Revision: ${r.revisionSummary}`, '');
+  addSection('Scenario', r.scenario);
+  addSection('Technical meaning', r.technicalMeaning);
+  addSection(
+    'Explanation',
+    r.explanation && r.explanation !== r.technicalMeaning && r.explanation !== r.diagramExplanation
+      ? r.explanation
+      : '',
+  );
+  if (r.mermaid) addSection('Diagram', `\`\`\`mermaid\n${r.mermaid}\n\`\`\``);
+  addSection('Diagram walkthrough', r.diagramExplanation);
+  addSection('Example', r.example);
+  addSection('Common misconception', r.misconception);
+  addSection('Exam answer', r.examAnswer);
+  addSection('Memory trick', r.memoryTrick);
+  addSection('Revision summary', r.revisionSummary);
+
   if (r.takeaways?.length) {
-    lines.push('Takeaways:');
-    r.takeaways.forEach((t) => lines.push(`  • ${t}`));
+    lines.push('', '## Takeaways', '', ...r.takeaways.map((takeaway) => `- ${takeaway}`));
   }
-  if (r.keywords?.length) lines.push(`Keywords: ${r.keywords.join(', ')}`);
+  if (r.keywords?.length) addSection('Keywords', r.keywords.join(', '));
 
   return lines.join('\n').trim();
 }
 
-export function buildExamCopy(response) {
-  const r = response?.result;
-  if (!r?.examAnswer) return buildCopyPayload(response);
-  return [
-    response.topic,
-    response.subject,
-    '',
-    r.definition ? `Definition: ${r.definition}\n` : '',
-    r.examAnswer,
-    '',
-    r.keywords?.length ? `Keywords: ${r.keywords.join(', ')}` : '',
-    r.revisionSummary ? `\nRevision: ${r.revisionSummary}` : '',
-  ]
-    .filter((x) => x !== '')
-    .join('\n')
-    .trim();
+function markdownCell(value) {
+  return value.replace(/\r?\n/g, '<br>').replace(/\|/g, '\\|');
 }
