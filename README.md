@@ -16,17 +16,17 @@ College students studying computer science, software engineering, mathematics, a
 
 - Topic + subject + **learning depth** + **four explanation modes**
 - **Exam Mode** with **2-mark**, **5-mark**, and **10-mark** answer lengths
-- Sample topic chips (populate the topic and subject)
-- Copy explanation / exam answer
+- Sample topic chips plus **Surprise me** (populate the topic and subject)
+- Copy the full explanation as structured Markdown, including Mermaid source
 - **Still confused? Explain it simpler** — new model request, same context
-- Mermaid diagrams with safe fallback (`securityLevel: strict`)
+- Responsive, themed Mermaid diagrams with zoom, SVG export, and a safe source fallback (`securityLevel: strict`)
 - Server-side Gemma 4 via `@google/genai`
 
 ### Learning depth
 
 | Depth | Behavior |
 |-------|----------|
-| **Quick Refresher** | Essential idea + concise example |
+| **Quick Refresher** | Essential idea + concise example; concise notes |
 | **Foundational** | Prerequisites, terminology, core concept |
 | **Intermediate** | Default — how and why, with practical detail |
 | **Advanced** | Mechanisms, edge cases, trade-offs |
