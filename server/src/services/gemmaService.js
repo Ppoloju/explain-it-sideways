@@ -4,6 +4,13 @@ import { parseModelJson, normalizeResult } from '../utils/parseResponse.js';
 
 const DEFAULT_MODEL = 'gemma-4-26b-a4b-it';
 const GENERATION_TIMEOUT_MS = 90000;
+const MAX_OUTPUT_TOKENS = {
+  'quick-refresher': 1200,
+  foundational: 1800,
+  intermediate: 2400,
+  advanced: 3200,
+  'in-depth': 4096,
+};
 
 function getConfig() {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -47,6 +54,22 @@ function mapApiError(err) {
   return { status: 502, code: 'API_ERROR', message: 'The AI service returned an error. Try again shortly.' };
 }
 
+async function generateParsedResponse(ai, model, prompt, config) {
+  let response = await ai.models.generateContent({ model, contents: prompt, config });
+  let parsed = parseModelJson(response?.text);
+
+  if (!parsed.ok) {
+    response = await ai.models.generateContent({
+      model,
+      contents: `${prompt}\n\nFormatting correction: your previous output was not valid JSON. Return the same answer again as one complete JSON object only. Escape quotes and newlines inside string values.`,
+      config: { ...config, temperature: 0.2 },
+    });
+    parsed = parseModelJson(response?.text);
+  }
+
+  return { response, parsed };
+}
+
 export async function generateExplanation(params) {
   const { apiKey, model } = getConfig();
 
@@ -69,27 +92,27 @@ export async function generateExplanation(params) {
   });
 
   try {
-    const response = await Promise.race([
-      ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
-          temperature: params.simplify ? 0.85 : 0.7,
-          maxOutputTokens: 4096,
-        },
+    const { response, parsed } = await Promise.race([
+      generateParsedResponse(ai, model, prompt, {
+        temperature: params.simplify ? 0.85 : 0.7,
+        maxOutputTokens:
+          params.mode === 'exam' && params.answerLength === '10-mark'
+            ? 4096
+            : params.simplify
+              ? 1800
+              : MAX_OUTPUT_TOKENS[params.learningDepth] || MAX_OUTPUT_TOKENS.intermediate,
       }),
       timeoutPromise,
     ]);
 
-    const text = response?.text;
-    if (!text) {
+    if (!response?.text) {
       const err = new Error('No text in response');
       err.mapped = { status: 502, code: 'EMPTY_RESPONSE', message: 'Model returned an empty response. Try again.' };
       throw err;
     }
 
-    const parsed = parseModelJson(text);
     if (!parsed.ok) {
+      console.error(`Model returned invalid JSON after retry: ${parsed.error}`);
       const err = new Error(parsed.error);
       err.mapped = {
         status: 502,
