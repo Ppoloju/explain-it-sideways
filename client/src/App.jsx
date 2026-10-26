@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RotateCcw, Sparkles } from 'lucide-react';
+import { ChevronDown, Dice5, RotateCcw, Sparkles } from 'lucide-react';
 import { explainTopic, fetchHealth } from './api.js';
 import {
   MODES,
@@ -8,6 +8,7 @@ import {
   LEARNING_DEPTHS,
   ANSWER_LENGTHS,
   subjectCode,
+  subjectLabel,
 } from './constants.js';
 import ResultPanel from './components/ResultPanel.jsx';
 
@@ -30,7 +31,7 @@ export default function App() {
   useEffect(() => {
     fetchHealth()
       .then(setApiStatus)
-      .catch(() => setApiStatus({ apiKeyConfigured: false }));
+      .catch(() => setApiStatus({ apiKeyConfigured: false, unreachable: true }));
   }, []);
 
   const runExplain = useCallback(
@@ -56,48 +57,56 @@ export default function App() {
 
       if (simplify) {
         setSimplifyLoading(true);
+        setLoading(false);
       } else {
         setLoading(true);
+        setSimplifyLoading(false);
         setResponse(null);
         setSimplifiedLayer(null);
       }
       setError('');
 
-      const { ok, data } = await explainTopic(
-        {
-          topic: trimmed,
-          subject: useSubject,
-          learningDepth: useLearningDepth,
-          mode: useMode,
-          answerLength: useMode === 'exam' ? useAnswerLength : undefined,
-          simplify,
-          previousExplanation,
-        },
-        controller.signal,
-      );
+      try {
+        const { ok, data } = await explainTopic(
+          {
+            topic: trimmed,
+            subject: useSubject,
+            learningDepth: useLearningDepth,
+            mode: useMode,
+            answerLength: useMode === 'exam' ? useAnswerLength : undefined,
+            simplify,
+            previousExplanation,
+          },
+          controller.signal,
+        );
 
-      if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return;
 
-      if (simplify) {
-        setSimplifyLoading(false);
-      } else {
-        setLoading(false);
-      }
-
-      if (!ok || !data.success) {
-        if (data.code !== 'DUPLICATE_REQUEST') {
-          setError(data.error || 'Could not generate an explanation.');
+        if (!ok || !data.success) {
+          if (data.code !== 'DUPLICATE_REQUEST') {
+            setError(data.error || 'Could not generate an explanation.');
+          }
+          return;
         }
-        return;
-      }
 
-      if (simplify) {
-        setSimplifiedLayer(data);
-      } else {
-        setResponse(data);
-        requestAnimationFrame(() => {
-          resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
+        if (simplify) {
+          setSimplifiedLayer(data);
+        } else {
+          setResponse(data);
+          requestAnimationFrame(() => {
+            resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        }
+      } catch (requestError) {
+        if (!controller.signal.aborted) {
+          console.error('Explanation request failed:', requestError);
+          setError('Could not connect to the explanation service. Check that the server is running and try again.');
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setSimplifyLoading(false);
+        }
       }
     },
     [topic, subject, mode, learningDepth, answerLength],
@@ -112,6 +121,12 @@ export default function App() {
     setTopic(sample.topic);
     setSubject(sample.subject);
     setError('');
+  }
+
+  function handleSurprise() {
+    const options = SAMPLE_TOPICS.filter((sample) => sample.topic !== topic);
+    const sample = options[Math.floor(Math.random() * options.length)];
+    handleSample(sample);
   }
 
   function handleReset() {
@@ -194,8 +209,14 @@ export default function App() {
         </div>
         {apiStatus && !apiStatus.apiKeyConfigured ? (
           <p className="api-hint" role="status">
-            API key not configured — add <code>GEMINI_API_KEY</code> to <code>server/.env</code> for live
-            answers.
+            {apiStatus.unreachable ? (
+              'Could not reach the explanation service. Check that the server is running.'
+            ) : (
+              <>
+                API key not configured — add <code>GEMINI_API_KEY</code> to <code>server/.env</code> for live
+                answers.
+              </>
+            )}
           </p>
         ) : null}
       </header>
@@ -222,38 +243,44 @@ export default function App() {
             <div className="field-grid">
               <div className="field">
                 <label htmlFor="subject">Subject</label>
-                <select
-                  id="subject"
-                  name="subject"
-                  className="subject-select"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  disabled={loading}
-                >
-                  {SUBJECTS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                <div className="select-wrap">
+                  <select
+                    id="subject"
+                    name="subject"
+                    className="subject-select"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    disabled={loading}
+                  >
+                    {SUBJECTS.map((s) => (
+                      <option key={s} value={s}>
+                        {subjectLabel(s)}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="select-chevron" size={17} aria-hidden />
+                </div>
               </div>
 
               <div className="field">
                 <label htmlFor="learningDepth">Learning depth</label>
-                <select
-                  id="learningDepth"
-                  name="learningDepth"
-                  className="subject-select"
-                  value={learningDepth}
-                  onChange={(e) => setLearningDepth(e.target.value)}
-                  disabled={loading}
-                >
-                  {LEARNING_DEPTHS.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="select-wrap">
+                  <select
+                    id="learningDepth"
+                    name="learningDepth"
+                    className="subject-select"
+                    value={learningDepth}
+                    onChange={(e) => setLearningDepth(e.target.value)}
+                    disabled={loading}
+                  >
+                    {LEARNING_DEPTHS.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="select-chevron" size={17} aria-hidden />
+                </div>
               </div>
             </div>
 
@@ -319,7 +346,12 @@ export default function App() {
             </div>
 
             <div className="samples">
-              <p className="meta-label">Sample topics</p>
+              <div className="samples-heading">
+                <p className="meta-label">Sample topics</p>
+                <button type="button" className="surprise-btn" onClick={handleSurprise} disabled={loading}>
+                  <Dice5 size={15} aria-hidden /> Surprise me
+                </button>
+              </div>
               <div className="sample-chips">
                 {SAMPLE_TOPICS.map((s) => (
                   <button
